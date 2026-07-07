@@ -3,6 +3,7 @@ package com.notes.client.ui;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JComponent;
+import javax.swing.JEditorPane;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JPanel;
@@ -96,6 +97,18 @@ public final class Theme {
         area.setLineWrap(true);
         area.setWrapStyleWord(true);
         return area;
+    }
+
+    public static JEditorPane htmlPane() {
+        JEditorPane pane = new JEditorPane();
+        pane.setContentType("text/html");
+        pane.setEditable(false);
+        pane.setBackground(PANEL_ALT);
+        pane.setForeground(TEXT);
+        pane.setBorder(compoundBorder());
+        pane.putClientProperty(JEditorPane.HONOR_DISPLAY_PROPERTIES, Boolean.TRUE);
+        pane.setFont(bodyFont());
+        return pane;
     }
 
     public static JScrollPane scrollPane(JComponent component) {
