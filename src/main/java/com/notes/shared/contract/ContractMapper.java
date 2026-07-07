@@ -22,6 +22,7 @@ public final class ContractMapper {
         map.put("title", note.getTitle());
         map.put("content", note.getContent());
         map.put("pinned", note.isPinned());
+        map.put("archived", note.isArchived());
         map.put("createdAt", note.getCreatedAt());
         map.put("updatedAt", note.getUpdatedAt());
         return map;
@@ -33,6 +34,7 @@ public final class ContractMapper {
         note.setTitle(JsonUtil.asString(map.get("title")));
         note.setContent(JsonUtil.asString(map.get("content")));
         note.setPinned(JsonUtil.asBoolean(map.get("pinned")));
+        note.setArchived(JsonUtil.asBoolean(map.get("archived")));
         note.setCreatedAt(JsonUtil.asLong(map.get("createdAt")));
         note.setUpdatedAt(JsonUtil.asLong(map.get("updatedAt")));
         return note;
@@ -85,7 +87,8 @@ public final class ContractMapper {
         for (Object value : JsonUtil.asList(map.get("notes"))) {
             notes.add(noteFromMap(JsonUtil.asObject(value)));
         }
-        notes.sort(Comparator.comparing(Note::isPinned).reversed()
+        notes.sort(Comparator.comparing(Note::isArchived)
+                .thenComparing(Note::isPinned, Comparator.reverseOrder())
                 .thenComparing(Note::getUpdatedAt, Comparator.reverseOrder()));
         snapshot.setNotes(notes);
 

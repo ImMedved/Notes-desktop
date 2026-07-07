@@ -46,6 +46,8 @@ import java.awt.Point;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -61,13 +63,14 @@ public class WidgetFrame extends JFrame {
         return thread;
     });
 
-    private final DefaultListModel<Note> noteListModel = new DefaultListModel<>();
+    private final DefaultListModel<NoteListEntry> noteListModel = new DefaultListModel<>();
     private final DefaultListModel<TimerEntry> timerListModel = new DefaultListModel<>();
-    private final JList<Note> noteList = new JList<>(noteListModel);
+    private final JList<NoteListEntry> noteList = new JList<>(noteListModel);
     private final JList<TimerEntry> timerList = new JList<>(timerListModel);
     private final JTextField noteTitleField = Theme.textField();
     private final JTextArea noteContentArea = Theme.textArea();
     private final JCheckBox pinNoteCheckBox = new JCheckBox("Закрепить");
+    private final JCheckBox archiveNoteCheckBox = new JCheckBox("В архиве");
     private final JLabel noteMetaLabel = Theme.mutedLabel("Локальный кеш");
     private final JLabel timerDetailLabel = Theme.label("00:00:00");
     private final JLabel timerMetaLabel = Theme.mutedLabel("Нет выбранного таймера");
@@ -84,6 +87,9 @@ public class WidgetFrame extends JFrame {
 
     private boolean suppressNoteEvents;
     private boolean suppressNoteSelectionEvents;
+    private boolean archiveView;
+    private String activeNoteSelectionId;
+    private String archivedNoteSelectionId;
     private Point dragStart;
 
     public WidgetFrame(ClientAppService appService) {
@@ -106,6 +112,7 @@ public class WidgetFrame extends JFrame {
         add(buildContent(), BorderLayout.CENTER);
 
         styleCheckbox(pinNoteCheckBox);
+        styleCheckbox(archiveNoteCheckBox);
         configureNoteTab();
         configureTimerTab();
         configureSyncTab();
@@ -198,10 +205,17 @@ public class WidgetFrame extends JFrame {
         noteList.setCellRenderer(Theme.listRenderer(new DefaultListCellRenderer() {
             @Override
             public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
-                Note note = (Note) value;
-                String prefix = note.isPinned() ? "\u2022 " : "";
-                String text = "<html><b>" + escape(prefix + note.getTitle()) + "</b><br/><span style='color:#9AA6B2;'>"
-                        + DATE_TIME_FORMATTER.format(Instant.ofEpochMilli(note.getUpdatedAt())) + "</span></html>";
+                NoteListEntry entry = (NoteListEntry) value;
+                String text;
+                if (entry.navigation()) {
+                    text = "<html><b>" + escape(entry.title()) + "</b><br/><span style='color:#9AA6B2;'>"
+                            + escape(entry.subtitle()) + "</span></html>";
+                } else {
+                    Note note = entry.note();
+                    String prefix = note.isPinned() ? "\u2022 " : "";
+                    text = "<html><b>" + escape(prefix + note.getTitle()) + "</b><br/><span style='color:#9AA6B2;'>"
+                            + DATE_TIME_FORMATTER.format(Instant.ofEpochMilli(note.getUpdatedAt())) + "</span></html>";
+                }
                 return super.getListCellRendererComponent(list, text, index, isSelected, cellHasFocus);
             }
         }));
@@ -217,7 +231,12 @@ public class WidgetFrame extends JFrame {
         JButton add = Theme.accentButton("Новая");
         add.addActionListener(event -> runAsync(() -> {
             Note created = appService.createNote();
-            SwingUtilities.invokeLater(() -> selectNote(created.getId()));
+            SwingUtilities.invokeLater(() -> {
+                archiveView = false;
+                activeNoteSelectionId = created.getId();
+                refreshFromState();
+                selectNote(created.getId());
+            });
         }));
         JButton delete = Theme.button("Удалить");
         delete.addActionListener(event -> runAsync(this::deleteSelectedNote));
@@ -234,7 +253,12 @@ public class WidgetFrame extends JFrame {
         noteTitleField.setPreferredSize(new Dimension(320, 40));
         editorTop.add(noteTitleField, BorderLayout.CENTER);
         pinNoteCheckBox.setBackground(Theme.PANEL);
-        editorTop.add(pinNoteCheckBox, BorderLayout.EAST);
+        archiveNoteCheckBox.setBackground(Theme.PANEL);
+        JPanel noteFlags = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        noteFlags.setBackground(Theme.PANEL);
+        noteFlags.add(pinNoteCheckBox);
+        noteFlags.add(archiveNoteCheckBox);
+        editorTop.add(noteFlags, BorderLayout.EAST);
 
         JPanel toolbar = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
         toolbar.setBackground(Theme.PANEL);
@@ -456,6 +480,12 @@ public class WidgetFrame extends JFrame {
     private void configureNoteTab() {
         noteList.addListSelectionListener(event -> {
             if (!event.getValueIsAdjusting() && !suppressNoteSelectionEvents) {
+                NoteListEntry entry = noteList.getSelectedValue();
+                if (entry != null && entry.navigation()) {
+                    toggleArchiveView(entry.action() == NoteListAction.OPEN_ARCHIVE);
+                    return;
+                }
+                rememberCurrentNoteSelection();
                 loadSelectedNoteIntoEditor();
             }
         });
@@ -478,6 +508,7 @@ public class WidgetFrame extends JFrame {
         noteTitleField.getDocument().addDocumentListener(noteListener);
         noteContentArea.getDocument().addDocumentListener(noteListener);
         pinNoteCheckBox.addActionListener(event -> scheduleNoteSave());
+        archiveNoteCheckBox.addActionListener(event -> scheduleNoteSave());
     }
 
     private void configureTimerTab() {
@@ -504,12 +535,13 @@ public class WidgetFrame extends JFrame {
     }
 
     private void refreshNoteList(ClientViewState viewState) {
-        String selectedId = selectedNoteId();
+        String selectedId = archiveView ? archivedNoteSelectionId : activeNoteSelectionId;
         boolean selectionStillExists = false;
         suppressNoteSelectionEvents = true;
         noteListModel.clear();
-        for (Note note : viewState.getSnapshot().getNotes()) {
-            noteListModel.addElement(note);
+        noteListModel.addElement(archiveView ? NoteListEntry.backEntry() : NoteListEntry.archiveEntry());
+        for (Note note : filteredNotes(viewState)) {
+            noteListModel.addElement(NoteListEntry.noteEntry(note));
             if (Objects.equals(note.getId(), selectedId)) {
                 selectionStillExists = true;
             }
@@ -517,8 +549,8 @@ public class WidgetFrame extends JFrame {
         if (selectedId != null) {
             selectNote(selectedId);
         }
-        if (noteList.getSelectedIndex() == -1 && !noteListModel.isEmpty()) {
-            noteList.setSelectedIndex(0);
+        if (noteList.getSelectedIndex() == -1 && noteListModel.size() > 1) {
+            noteList.setSelectedIndex(1);
         }
         suppressNoteSelectionEvents = false;
         if (!selectionStillExists || selectedId == null) {
@@ -566,19 +598,22 @@ public class WidgetFrame extends JFrame {
     }
 
     private void loadSelectedNoteIntoEditor() {
-        Note note = noteList.getSelectedValue();
+        Note note = selectedNote();
         suppressNoteEvents = true;
         if (note == null) {
             noteTitleField.setText("");
             noteContentArea.setText("");
             pinNoteCheckBox.setSelected(false);
-            noteMetaLabel.setText("Выберите заметку");
+            archiveNoteCheckBox.setSelected(false);
+            noteMetaLabel.setText(archiveView ? "Выберите заметку из архива" : "Выберите заметку");
         } else {
             noteTitleField.setText(note.getTitle());
             noteContentArea.setText(note.getContent());
             pinNoteCheckBox.setSelected(note.isPinned());
+            archiveNoteCheckBox.setSelected(note.isArchived());
             noteMetaLabel.setText("Изменена: " + DATE_TIME_FORMATTER.format(Instant.ofEpochMilli(note.getUpdatedAt())));
         }
+        setNoteEditorEnabled(note != null);
         suppressNoteEvents = false;
     }
 
@@ -586,7 +621,7 @@ public class WidgetFrame extends JFrame {
         if (suppressNoteEvents) {
             return;
         }
-        Note selected = noteList.getSelectedValue();
+        Note selected = selectedNote();
         if (selected == null) {
             return;
         }
@@ -595,13 +630,14 @@ public class WidgetFrame extends JFrame {
         updated.setTitle(noteTitleField.getText().trim().isBlank() ? "Без названия" : noteTitleField.getText().trim());
         updated.setContent(noteContentArea.getText());
         updated.setPinned(pinNoteCheckBox.isSelected());
+        updated.setArchived(archiveNoteCheckBox.isSelected());
         updated.setCreatedAt(selected.getCreatedAt());
         updated.setUpdatedAt(System.currentTimeMillis());
         appService.upsertNote(updated);
     }
 
     private void deleteSelectedNote() throws Exception {
-        Note selected = noteList.getSelectedValue();
+        Note selected = selectedNote();
         if (selected != null) {
             appService.deleteNote(selected.getId());
         }
@@ -766,9 +802,47 @@ public class WidgetFrame extends JFrame {
         checkBox.setBorder(BorderFactory.createEmptyBorder());
     }
 
+    private List<Note> filteredNotes(ClientViewState viewState) {
+        List<Note> notes = new ArrayList<>();
+        for (Note note : viewState.getSnapshot().getNotes()) {
+            if (note.isArchived() == archiveView) {
+                notes.add(note);
+            }
+        }
+        return notes;
+    }
+
+    private void toggleArchiveView(boolean nextArchiveView) {
+        rememberCurrentNoteSelection();
+        archiveView = nextArchiveView;
+        refreshFromState();
+    }
+
+    private void rememberCurrentNoteSelection() {
+        String selectedId = selectedNoteId();
+        if (archiveView) {
+            archivedNoteSelectionId = selectedId;
+        } else {
+            activeNoteSelectionId = selectedId;
+        }
+    }
+
+    private void setNoteEditorEnabled(boolean enabled) {
+        noteTitleField.setEnabled(enabled);
+        noteContentArea.setEnabled(enabled);
+        pinNoteCheckBox.setEnabled(enabled);
+        archiveNoteCheckBox.setEnabled(enabled);
+    }
+
+    private Note selectedNote() {
+        NoteListEntry entry = noteList.getSelectedValue();
+        return entry == null ? null : entry.note();
+    }
+
     private void selectNote(String noteId) {
         for (int i = 0; i < noteListModel.size(); i++) {
-            if (Objects.equals(noteListModel.get(i).getId(), noteId)) {
+            NoteListEntry entry = noteListModel.get(i);
+            if (entry.note() != null && Objects.equals(entry.note().getId(), noteId)) {
                 noteList.setSelectedIndex(i);
                 noteList.ensureIndexIsVisible(i);
                 return;
@@ -787,7 +861,7 @@ public class WidgetFrame extends JFrame {
     }
 
     private String selectedNoteId() {
-        Note note = noteList.getSelectedValue();
+        Note note = selectedNote();
         return note == null ? null : note.getId();
     }
 
@@ -826,6 +900,29 @@ public class WidgetFrame extends JFrame {
 
     private static String escape(String value) {
         return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+    }
+
+    private enum NoteListAction {
+        OPEN_ARCHIVE,
+        BACK_TO_NOTES
+    }
+
+    private record NoteListEntry(Note note, String title, String subtitle, NoteListAction action) {
+        private static NoteListEntry noteEntry(Note note) {
+            return new NoteListEntry(note, null, null, null);
+        }
+
+        private static NoteListEntry archiveEntry() {
+            return new NoteListEntry(null, "Архив", "Открыть архив заметок", NoteListAction.OPEN_ARCHIVE);
+        }
+
+        private static NoteListEntry backEntry() {
+            return new NoteListEntry(null, "Назад к заметкам", "Вернуться к активным заметкам", NoteListAction.BACK_TO_NOTES);
+        }
+
+        private boolean navigation() {
+            return action != null;
+        }
     }
 
     private interface ThrowingRunnable {

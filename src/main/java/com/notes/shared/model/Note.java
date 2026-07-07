@@ -7,6 +7,7 @@ public class Note {
     private String title = "";
     private String content = "";
     private boolean pinned;
+    private boolean archived;
     private long createdAt = System.currentTimeMillis();
     private long updatedAt = System.currentTimeMillis();
 
@@ -40,6 +41,14 @@ public class Note {
 
     public void setPinned(boolean pinned) {
         this.pinned = pinned;
+    }
+
+    public boolean isArchived() {
+        return archived;
+    }
+
+    public void setArchived(boolean archived) {
+        this.archived = archived;
     }
 
     public long getCreatedAt() {

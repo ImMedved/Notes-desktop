@@ -81,6 +81,7 @@ public class ClientAppService {
         note.setTitle("Новая заметка");
         note.setContent("# Новая заметка\n\n- первая мысль");
         note.setPinned(false);
+        note.setArchived(false);
         note.setCreatedAt(System.currentTimeMillis());
         note.setUpdatedAt(System.currentTimeMillis());
         apiClient.upsertNote(config, note);
@@ -247,6 +248,7 @@ public class ClientAppService {
         copy.setTitle(source.getTitle());
         copy.setContent(source.getContent());
         copy.setPinned(source.isPinned());
+        copy.setArchived(source.isArchived());
         copy.setCreatedAt(source.getCreatedAt());
         copy.setUpdatedAt(source.getUpdatedAt());
         return copy;
@@ -267,7 +269,8 @@ public class ClientAppService {
     }
 
     private static void sortSnapshot(ServerSnapshot snapshot) {
-        snapshot.getNotes().sort(Comparator.comparing(Note::isPinned).reversed()
+        snapshot.getNotes().sort(Comparator.comparing(Note::isArchived)
+                .thenComparing(Note::isPinned, Comparator.reverseOrder())
                 .thenComparing(Note::getUpdatedAt, Comparator.reverseOrder()));
         snapshot.getTimers().sort(Comparator.comparing(TimerEntry::getUpdatedAt, Comparator.reverseOrder()));
     }
