@@ -45,7 +45,7 @@ public final class MarkdownPreviewRenderer {
                         font-size: 14px;
                         line-height: 1.6;
                         margin: 0;
-                        padding: 0 4px 12px 0;
+                        padding: 0 8px 12px 12px;
                       }
                       h1, h2, h3, h4, h5, h6 {
                         color: #%s;
@@ -53,6 +53,9 @@ public final class MarkdownPreviewRenderer {
                       }
                       p, ul, ol, blockquote, pre, table {
                         margin: 0 0 14px 0;
+                      }
+                      ul, ol {
+                        padding-left: 22px;
                       }
                       a {
                         color: #%s;
