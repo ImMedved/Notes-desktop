@@ -216,6 +216,10 @@ public class NotesTabPanel extends JPanel {
         return linkButton;
     }
 
+    public JEditorPane getPreviewPane() {
+        return previewPane;
+    }
+
     public javax.swing.JLabel getNoteMetaLabel() {
         return noteMetaLabel;
     }

@@ -23,6 +23,7 @@ import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+import javax.swing.event.HyperlinkEvent;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
@@ -180,20 +181,33 @@ public class WidgetFrame extends JFrame {
         DocumentListener noteListener = new DocumentListener() {
             @Override
             public void insertUpdate(DocumentEvent event) {
-                scheduleNoteSave();
+                onNoteContentChanged();
             }
 
             @Override
             public void removeUpdate(DocumentEvent event) {
-                scheduleNoteSave();
+                onNoteContentChanged();
             }
 
             @Override
             public void changedUpdate(DocumentEvent event) {
-                scheduleNoteSave();
+                onNoteContentChanged();
             }
         };
         notesTabPanel.getNoteTitleField().getDocument().addDocumentListener(noteListener);
+        notesTabPanel.getNoteContentArea().getDocument().addDocumentListener(noteListener);
+        notesTabPanel.getPreviewPane().addHyperlinkListener(event -> {
+            if (event.getEventType() != HyperlinkEvent.EventType.ACTIVATED || event.getDescription() == null) {
+                return;
+            }
+            if (!event.getDescription().startsWith("task://")) {
+                return;
+            }
+            int taskIndex = parseTaskIndex(event.getDescription());
+            if (taskIndex >= 0) {
+                runAsync(() -> toggleTaskFromPreview(taskIndex));
+            }
+        });
     }
 
     private void bindTimers() {
@@ -520,6 +534,55 @@ public class WidgetFrame extends JFrame {
     private void scheduleNoteSave() {
         if (!suppressNoteEvents) {
             noteAutoSaveTimer.restart();
+        }
+    }
+
+    private void onNoteContentChanged() {
+        if (suppressNoteEvents) {
+            return;
+        }
+        updatePreviewFromEditor();
+        scheduleNoteSave();
+    }
+
+    private void updatePreviewFromEditor() {
+        notesTabPanel.setPreviewHtml(MarkdownPreviewRenderer.render(notesTabPanel.getNoteContentArea().getText()));
+    }
+
+    private void toggleTaskFromPreview(int taskIndex) throws Exception {
+        Note selected = selectedNote();
+        if (selected == null) {
+            return;
+        }
+
+        String currentMarkdown = notesTabPanel.getNoteContentArea().getText();
+        String toggledMarkdown = MarkdownPreviewRenderer.toggleTask(currentMarkdown, taskIndex);
+        if (Objects.equals(currentMarkdown, toggledMarkdown)) {
+            return;
+        }
+
+        suppressNoteEvents = true;
+        try {
+            notesTabPanel.getNoteContentArea().setText(toggledMarkdown);
+            notesTabPanel.setPreviewHtml(MarkdownPreviewRenderer.render(toggledMarkdown));
+        } finally {
+            suppressNoteEvents = false;
+        }
+
+        Note updated = copyOf(selected);
+        updated.setTitle(notesTabPanel.getNoteTitleField().getText().trim().isBlank()
+                ? "Без названия"
+                : notesTabPanel.getNoteTitleField().getText().trim());
+        updated.setContent(toggledMarkdown);
+        updated.setUpdatedAt(System.currentTimeMillis());
+        appService.upsertNote(updated);
+    }
+
+    private int parseTaskIndex(String description) {
+        try {
+            return Integer.parseInt(description.substring("task://".length()));
+        } catch (NumberFormatException exception) {
+            return -1;
         }
     }
 
