@@ -31,4 +31,5 @@ jpackage `
   --main-jar $jar.Name `
   --main-class com.notes.client.Main `
   --dest $dist `
-  --app-version 1.0.0"
+  --app-version 1.0.0 `
+  --vendor "Нейрослоп"

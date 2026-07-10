@@ -3,7 +3,7 @@ package com.notes.client.config;
 public class ClientConfig {
     private String serverBaseUrl = "http://127.0.0.1:8080";
     private String apiKey = "change-me";
-    private int syncIntervalSeconds = 60;
+    private int syncIntervalSeconds = 360;
     private boolean alwaysOnTop = true;
     private String clientId = "windows-widget";
 

@@ -106,13 +106,9 @@ public class SyncTabPanel extends JPanel {
         JTextArea instructions = Theme.textArea();
         instructions.setEditable(false);
         instructions.setText("""
-                Рекомендуемая схема:
-                1. На Arch-сервере запущен backend в Docker.
-                2. Доступ к серверу идет по Tailscale IP или MagicDNS имени.
-                3. Все клиенты используют один и тот же HTTP API и один API key.
-
-                Пример URL:
-                http://notes-server.tailnet-name.ts.net:8080
+                A server connection is required for proper operation.
+                Editing notes and the clock is not possible without a connection.
+                The sync frequency can be adjusted in 15-second increments.
                 """);
 
         JPanel right = Theme.panel();

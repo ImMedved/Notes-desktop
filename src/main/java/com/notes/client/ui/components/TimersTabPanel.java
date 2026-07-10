@@ -82,13 +82,7 @@ public class TimersTabPanel extends JPanel {
         JTextArea description = Theme.textArea();
         description.setEditable(false);
         description.setText("""
-                В этой версии клиент не хранит серверные заметки и таймеры как источник истины.
-                Все изменения отправляются на сервер, а UI после этого подтягивает свежий snapshot.
-
-                Это упрощает добавление Android-клиента:
-                - один API
-                - одна ревизия состояния
-                - одинаковые DTO для всех клиентов
+                Creating new stopwatches and timers is only available when the server is connected.
                 """);
 
         detail.add(title, BorderLayout.NORTH);
