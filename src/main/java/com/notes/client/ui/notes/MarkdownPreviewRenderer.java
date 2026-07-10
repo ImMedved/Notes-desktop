@@ -15,7 +15,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public final class MarkdownPreviewRenderer {
-    private static final Pattern TASK_PATTERN = Pattern.compile("^(\\s*)([-*+]|\\d+\\.)\\s+\\[( |x|X)]\\s+(.*)$");
+    private static final Pattern TASK_PATTERN = Pattern.compile("^(\\s*)([-*+]|\\d+\\.)\\s+\\[( |x|X)]\\s+(.*?)(?:\\s+<!--\\s*task-index:(\\d+)\\s*-->)?$");
+    private static final Pattern RAW_TASK_PATTERN = Pattern.compile("^(\\s*)([-*+]|\\d+\\.)\\s+\\[( |x|X)]\\s+(.*)$");
     private static final Parser PARSER;
     private static final HtmlRenderer RENDERER;
 
@@ -35,7 +36,8 @@ public final class MarkdownPreviewRenderer {
 
     public static String render(String markdown) {
         String safeMarkdown = markdown == null || markdown.isBlank() ? "_Пустая заметка_" : markdown;
-        String htmlBody = RENDERER.render(PARSER.parse(transformTaskLists(safeMarkdown)));
+        String displayMarkdown = MarkdownPreviewLayoutBuilder.build(safeMarkdown);
+        String htmlBody = RENDERER.render(PARSER.parse(transformTaskLists(displayMarkdown)));
         return """
                 <html>
                   <head>
@@ -159,7 +161,7 @@ public final class MarkdownPreviewRenderer {
         String[] lines = markdown.split("\\r?\\n", -1);
         int currentTask = 0;
         for (int i = 0; i < lines.length; i++) {
-            Matcher matcher = TASK_PATTERN.matcher(lines[i]);
+            Matcher matcher = RAW_TASK_PATTERN.matcher(lines[i]);
             if (!matcher.matches()) {
                 continue;
             }
@@ -176,7 +178,6 @@ public final class MarkdownPreviewRenderer {
     private static String transformTaskLists(String markdown) {
         String[] lines = markdown.split("\\r?\\n", -1);
         List<String> output = new ArrayList<>();
-        int taskIndex = 0;
 
         for (String line : lines) {
             Matcher matcher = TASK_PATTERN.matcher(line);
@@ -189,22 +190,22 @@ public final class MarkdownPreviewRenderer {
             boolean checked = !" ".equals(matcher.group(3));
             String checkboxSymbol = checked ? "&#9745;" : "&#9744;";
             String inlineHtml = renderInline(matcher.group(4));
+            String taskLink = matcher.group(5) == null ? "#" : "task://%s".formatted(matcher.group(5));
             output.add("""
                     <div style="margin-left:%dpx">
                       <table class="task-item">
                         <tr>
-                          <td class="task-box-cell"><a class="task-box" href="task://%d">%s</a></td>
+                          <td class="task-box-cell"><a class="task-box" href="%s">%s</a></td>
                           <td class="task-text">%s</td>
                         </tr>
                       </table>
                     </div>
                     """.formatted(
                     indent * 8,
-                    taskIndex,
+                    taskLink,
                     checkboxSymbol,
                     inlineHtml
             ));
-            taskIndex++;
         }
         return String.join("\n", output);
     }
