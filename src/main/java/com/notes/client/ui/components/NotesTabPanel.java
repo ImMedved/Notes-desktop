@@ -52,6 +52,8 @@ public class NotesTabPanel extends JPanel {
     private final javax.swing.JLabel noteMetaLabel = Theme.mutedLabel("Локальный кеш");
     private final JPanel markdownToolbar = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
     private final JPanel contentCardPanel = new JPanel(new CardLayout());
+    private final JScrollPane previewScrollPane = Theme.smoothScrollPane(previewPane);
+    private final JScrollPane editorScrollPane = Theme.scrollPane(noteContentArea);
 
     public NotesTabPanel() {
         super(new BorderLayout(16, 16));
@@ -61,6 +63,7 @@ public class NotesTabPanel extends JPanel {
     }
 
     private void build() {
+        Theme.installUndo(noteContentArea);
         noteList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         Theme.styleList(noteList);
         noteList.setCellRenderer(Theme.listRenderer(new DefaultListCellRenderer() {
@@ -125,8 +128,8 @@ public class NotesTabPanel extends JPanel {
         markdownToolbar.add(linkButton);
 
         contentCardPanel.setBackground(Theme.PANEL);
-        contentCardPanel.add(Theme.scrollPane(previewPane), PREVIEW_CARD);
-        contentCardPanel.add(Theme.scrollPane(noteContentArea), EDIT_CARD);
+        contentCardPanel.add(previewScrollPane, PREVIEW_CARD);
+        contentCardPanel.add(editorScrollPane, EDIT_CARD);
 
         JPanel topBlock = new JPanel();
         topBlock.setBackground(Theme.PANEL);

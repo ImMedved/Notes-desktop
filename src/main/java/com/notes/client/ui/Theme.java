@@ -8,11 +8,16 @@ import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
+import javax.swing.JScrollBar;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
+import javax.swing.KeyStroke;
+import javax.swing.Timer;
 import javax.swing.ListCellRenderer;
 import javax.swing.UIManager;
+import javax.swing.undo.UndoManager;
 import javax.swing.border.Border;
+import javax.swing.text.JTextComponent;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Component;
@@ -21,6 +26,9 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Insets;
 import java.awt.RenderingHints;
+import java.awt.event.ActionEvent;
+import java.awt.event.InputEvent;
+import java.awt.event.MouseWheelEvent;
 
 public final class Theme {
     public static final Color BACKGROUND = new Color(12, 17, 24);
@@ -118,6 +126,28 @@ public final class Theme {
         return scrollPane;
     }
 
+    public static JScrollPane smoothScrollPane(JComponent component) {
+        JScrollPane scrollPane = scrollPane(component);
+        scrollPane.getVerticalScrollBar().setUnitIncrement(18);
+        scrollPane.getVerticalScrollBar().setBlockIncrement(72);
+        installSmoothWheelScroll(scrollPane);
+        return scrollPane;
+    }
+
+    public static void installUndo(JTextComponent textComponent) {
+        UndoManager undoManager = new UndoManager();
+        textComponent.getDocument().addUndoableEditListener(undoManager);
+        textComponent.getInputMap().put(KeyStroke.getKeyStroke('Z', InputEvent.CTRL_DOWN_MASK), "undo-last-edit");
+        textComponent.getActionMap().put("undo-last-edit", new javax.swing.AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent event) {
+                if (undoManager.canUndo()) {
+                    undoManager.undo();
+                }
+            }
+        });
+    }
+
     public static JButton button(String text) {
         JButton button = new JButton(text);
         button.setFocusPainted(false);
@@ -162,6 +192,67 @@ public final class Theme {
                 BorderFactory.createLineBorder(new Color(56, 67, 79), 1, true),
                 BorderFactory.createEmptyBorder(8, 10, 8, 10)
         );
+    }
+
+    private static void installSmoothWheelScroll(JScrollPane scrollPane) {
+        SmoothScrollState state = new SmoothScrollState(scrollPane);
+        scrollPane.addMouseWheelListener(event -> {
+            if (event.isConsumed() || event.getScrollType() != MouseWheelEvent.WHEEL_UNIT_SCROLL) {
+                return;
+            }
+
+            JScrollBar scrollBar = scrollPane.getVerticalScrollBar();
+            if (!scrollBar.isVisible()) {
+                return;
+            }
+
+            int delta = (int) Math.round(event.getPreciseWheelRotation() * scrollBar.getUnitIncrement());
+            if (delta == 0) {
+                return;
+            }
+
+            event.consume();
+            state.scrollBy(delta);
+        });
+    }
+
+    private static final class SmoothScrollState {
+        private final JScrollPane scrollPane;
+        private final Timer timer;
+        private int targetValue;
+
+        private SmoothScrollState(JScrollPane scrollPane) {
+            this.scrollPane = scrollPane;
+            this.timer = new Timer(12, event -> animateStep());
+            this.timer.setRepeats(true);
+        }
+
+        private void scrollBy(int delta) {
+            JScrollBar scrollBar = scrollPane.getVerticalScrollBar();
+            int maxValue = Math.max(scrollBar.getMinimum(), scrollBar.getMaximum() - scrollBar.getVisibleAmount());
+            int current = scrollBar.getValue();
+            if (!timer.isRunning()) {
+                targetValue = current;
+            }
+            targetValue = Math.max(scrollBar.getMinimum(), Math.min(maxValue, targetValue + delta));
+            if (!timer.isRunning()) {
+                timer.start();
+            }
+        }
+
+        private void animateStep() {
+            JScrollBar scrollBar = scrollPane.getVerticalScrollBar();
+            int current = scrollBar.getValue();
+            int distance = targetValue - current;
+            if (Math.abs(distance) <= 1) {
+                scrollBar.setValue(targetValue);
+                timer.stop();
+                return;
+            }
+
+            int step = Math.max(1, Math.abs(distance) / 4);
+            scrollBar.setValue(current + Integer.signum(distance) * step);
+        }
     }
 
     private static final class RoundedBorder implements Border {
