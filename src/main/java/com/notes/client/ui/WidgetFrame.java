@@ -24,6 +24,9 @@ import javax.swing.Timer;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.event.HyperlinkEvent;
+import java.awt.KeyEventDispatcher;
+import java.awt.KeyboardFocusManager;
+import java.awt.event.KeyEvent;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
@@ -55,11 +58,13 @@ public class WidgetFrame extends JFrame {
     private final Timer noteAutoSaveTimer;
     private final Timer timerRefreshTimer;
     private final Timer autoSyncTimer;
+    private final KeyEventDispatcher noteEditorHotkeyDispatcher = this::dispatchNoteEditorHotkey;
 
     private DesktopShellIntegration shellIntegration;
     private boolean suppressNoteEvents;
     private boolean suppressNoteSelectionEvents;
     private boolean noteEditMode;
+    private boolean pendingRefreshWhileEditing;
     private boolean archiveView;
     private String activeNoteSelectionId;
     private String archivedNoteSelectionId;
@@ -89,6 +94,7 @@ public class WidgetFrame extends JFrame {
         bindTimers();
         bindSync();
         installShellIntegration();
+        KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(noteEditorHotkeyDispatcher);
 
         noteAutoSaveTimer = new Timer(700, event -> runAsync(this::persistSelectedNote));
         noteAutoSaveTimer.setRepeats(false);
@@ -96,14 +102,21 @@ public class WidgetFrame extends JFrame {
         timerRefreshTimer = new Timer(400, event -> refreshLiveTimerState());
         timerRefreshTimer.start();
 
-        autoSyncTimer = new Timer(viewState.getConfig().getSyncIntervalSeconds() * 1000, event -> syncNowAsync());
+        autoSyncTimer = new Timer(viewState.getConfig().getSyncIntervalSeconds() * 1000, event -> {
+            if (!noteEditMode) {
+                syncNowAsync();
+            }
+        });
         autoSyncTimer.start();
 
-        appService.addChangeListener(() -> SwingUtilities.invokeLater(this::refreshFromState));
+        appService.addChangeListener(() -> SwingUtilities.invokeLater(this::handleStateChange));
         refreshFromState();
     }
 
     public void syncNowAsync() {
+        if (noteEditMode) {
+            return;
+        }
         runAsync(() -> appService.syncNow(), true);
     }
 
@@ -165,6 +178,7 @@ public class WidgetFrame extends JFrame {
         notesTabPanel.getBoldButton().addActionListener(event -> wrapMarkdown("**", "**"));
         notesTabPanel.getCodeButton().addActionListener(event -> wrapMarkdown("```\n", "\n```"));
         notesTabPanel.getLinkButton().addActionListener(event -> wrapMarkdown("[", "](https://)"));
+        installNoteEditorHotkeys();
 
         notesTabPanel.getNoteList().addListSelectionListener(event -> {
             if (!event.getValueIsAdjusting() && !suppressNoteSelectionEvents) {
@@ -259,6 +273,7 @@ public class WidgetFrame extends JFrame {
     }
 
     private void exitApplication() {
+        KeyboardFocusManager.getCurrentKeyboardFocusManager().removeKeyEventDispatcher(noteEditorHotkeyDispatcher);
         background.shutdownNow();
         if (shellIntegration != null) {
             shellIntegration.close();
@@ -277,8 +292,19 @@ public class WidgetFrame extends JFrame {
         }
         runAsync(() -> {
             persistSelectedNote();
-            SwingUtilities.invokeLater(() -> setNoteEditMode(false));
+            SwingUtilities.invokeLater(() -> {
+                setNoteEditMode(false);
+                applyDeferredRefreshIfNeeded();
+            });
         });
+    }
+
+    private void handleStateChange() {
+        if (noteEditMode) {
+            pendingRefreshWhileEditing = true;
+            return;
+        }
+        refreshFromState();
     }
 
     private void refreshFromState() {
@@ -532,9 +558,7 @@ public class WidgetFrame extends JFrame {
     }
 
     private void scheduleNoteSave() {
-        if (!suppressNoteEvents) {
-            noteAutoSaveTimer.restart();
-        }
+        noteAutoSaveTimer.stop();
     }
 
     private void onNoteContentChanged() {
@@ -611,6 +635,43 @@ public class WidgetFrame extends JFrame {
         notesTabPanel.getNoteContentArea().requestFocusInWindow();
     }
 
+    private void installNoteEditorHotkeys() {
+    }
+
+    private boolean dispatchNoteEditorHotkey(KeyEvent event) {
+        if (event.getID() != KeyEvent.KEY_PRESSED || !event.isControlDown()) {
+            return false;
+        }
+        if (!noteEditMode || !notesTabPanel.getNoteContentArea().isFocusOwner()) {
+            return false;
+        }
+
+        char keyChar = Character.toLowerCase(event.getKeyChar());
+        if (event.getKeyCode() == KeyEvent.VK_T || keyChar == '\u0435') {
+            clickEditorButton(notesTabPanel.getTaskButton());
+            event.consume();
+            return true;
+        }
+        if (event.getKeyCode() == KeyEvent.VK_Q || keyChar == '\u0439') {
+            clickEditorButton(notesTabPanel.getQuoteButton());
+            event.consume();
+            return true;
+        }
+        if (event.getKeyCode() == KeyEvent.VK_BACK_QUOTE || keyChar == '`' || keyChar == '\u0451') {
+            clickEditorButton(notesTabPanel.getCodeButton());
+            event.consume();
+            return true;
+        }
+        return false;
+    }
+
+    private void clickEditorButton(javax.swing.JButton button) {
+        if (button.isEnabled()) {
+            button.doClick();
+            notesTabPanel.getNoteContentArea().requestFocusInWindow();
+        }
+    }
+
     private List<Note> filteredNotes(ClientViewState viewState) {
         List<Note> notes = new ArrayList<>();
         for (Note note : viewState.getSnapshot().getNotes()) {
@@ -638,7 +699,18 @@ public class WidgetFrame extends JFrame {
 
     private void setNoteEditMode(boolean editMode) {
         noteEditMode = editMode && selectedNote() != null;
+        if (noteEditMode) {
+            noteAutoSaveTimer.stop();
+        }
         notesTabPanel.setEditMode(noteEditMode);
+    }
+
+    private void applyDeferredRefreshIfNeeded() {
+        if (!pendingRefreshWhileEditing) {
+            return;
+        }
+        pendingRefreshWhileEditing = false;
+        refreshFromState();
     }
 
     private Note selectedNote() {
