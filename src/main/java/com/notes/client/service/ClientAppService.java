@@ -117,11 +117,18 @@ public class ClientAppService {
     }
 
     public synchronized TimerEntry createStopwatch(String name) throws Exception {
+        return createStopwatch(name, System.currentTimeMillis());
+    }
+
+    public synchronized TimerEntry createStopwatch(String name, long startedAt) throws Exception {
         TimerEntry timer = new TimerEntry();
         timer.setId(UUID.randomUUID().toString());
         timer.setMode(TimerMode.STOPWATCH);
         timer.setName(name == null || name.isBlank() ? "Секундомер" : name.trim());
         timer.setDurationMillis(365L * 24 * 60 * 60 * 1000);
+        timer.setStartedAt(startedAt);
+        timer.setAccumulatedMillis(0);
+        timer.setRunning(true);
         timer.setCreatedAt(System.currentTimeMillis());
         timer.setUpdatedAt(System.currentTimeMillis());
         apiClient.upsertTimer(config, timer);

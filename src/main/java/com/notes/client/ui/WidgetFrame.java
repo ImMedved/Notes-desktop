@@ -31,9 +31,11 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Point;
+import java.time.LocalDateTime;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Date;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -43,6 +45,7 @@ import java.util.concurrent.Executors;
 public class WidgetFrame extends JFrame {
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
             .withZone(ZoneId.systemDefault());
+    private static final DateTimeFormatter STOPWATCH_DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss");
 
     private final ClientAppService appService;
     private final ExecutorService background = Executors.newSingleThreadExecutor(runnable -> {
@@ -232,6 +235,7 @@ public class WidgetFrame extends JFrame {
         });
         timersTabPanel.getAddTimerButton().addActionListener(event -> openCountdownDialog());
         timersTabPanel.getAddStopwatchButton().addActionListener(event -> openStopwatchDialog());
+        timersTabPanel.getEditStopwatchButton().addActionListener(event -> openEditStopwatchDialog());
         timersTabPanel.getToggleButton().addActionListener(event -> runAsync(this::toggleSelectedTimer));
         timersTabPanel.getResetButton().addActionListener(event -> runAsync(this::resetSelectedTimer));
         timersTabPanel.getDeleteButton().addActionListener(event -> runAsync(this::deleteSelectedTimer));
@@ -464,8 +468,10 @@ public class WidgetFrame extends JFrame {
         if (timer == null) {
             timersTabPanel.getTimerDetailLabel().setText("00:00:00");
             timersTabPanel.getTimerMetaLabel().setText("Нет выбранного таймера");
+            timersTabPanel.getEditStopwatchButton().setEnabled(false);
             return;
         }
+        timersTabPanel.getEditStopwatchButton().setEnabled(timer.getMode() == TimerMode.STOPWATCH);
 
         long now = System.currentTimeMillis();
         String value = timer.getMode() == TimerMode.STOPWATCH
@@ -537,13 +543,105 @@ public class WidgetFrame extends JFrame {
     }
 
     private void openStopwatchDialog() {
-        String name = JOptionPane.showInputDialog(this, "Название секундомера", "Новый секундомер", JOptionPane.PLAIN_MESSAGE);
-        if (name != null) {
-            runAsync(() -> {
-                TimerEntry created = appService.createStopwatch(name);
-                SwingUtilities.invokeLater(() -> selectTimer(created.getId()));
-            });
+        StopwatchDialogResult result = showStopwatchDialog("Новый секундомер", null);
+        if (result == null) {
+            return;
         }
+        runAsync(() -> {
+            TimerEntry created = appService.createStopwatch(result.name(), result.startedAtEpochMillis());
+            SwingUtilities.invokeLater(() -> selectTimer(created.getId()));
+        });
+    }
+
+    private void openEditStopwatchDialog() {
+        TimerEntry selected = timersTabPanel.getTimerList().getSelectedValue();
+        if (selected == null || selected.getMode() != TimerMode.STOPWATCH) {
+            JOptionPane.showMessageDialog(this, "Выберите секундомер для редактирования.", "Редактирование секундомера", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+
+        StopwatchDialogResult result = showStopwatchDialog("Редактировать секундомер", selected);
+        if (result == null) {
+            return;
+        }
+
+        runAsync(() -> {
+            TimerEntry updated = copyTimer(selected);
+            updated.setName(result.name());
+            applyStopwatchStart(updated, result.startedAtEpochMillis());
+            appService.upsertTimer(updated);
+            SwingUtilities.invokeLater(() -> selectTimer(updated.getId()));
+        });
+    }
+
+    private StopwatchDialogResult showStopwatchDialog(String title, TimerEntry timer) {
+        javax.swing.JTextField nameField = Theme.textField();
+        nameField.setText(timer == null ? "" : timer.getName());
+
+        long initialStartedAt = timer == null
+                ? System.currentTimeMillis()
+                : stopwatchEffectiveStartedAt(timer, System.currentTimeMillis());
+        javax.swing.JSpinner dateTimeSpinner = new javax.swing.JSpinner(new javax.swing.SpinnerDateModel(new Date(initialStartedAt), null, null, java.util.Calendar.MINUTE));
+        dateTimeSpinner.setEditor(new javax.swing.JSpinner.DateEditor(dateTimeSpinner, "dd.MM.yyyy HH:mm:ss"));
+
+        javax.swing.JPanel panel = Theme.panel();
+        panel.setLayout(new BorderLayout(0, 12));
+
+        javax.swing.JPanel fields = new javax.swing.JPanel(new java.awt.GridLayout(0, 2, 8, 8));
+        fields.setBackground(Theme.PANEL);
+        fields.add(Theme.label("Название"));
+        fields.add(nameField);
+        fields.add(Theme.label("Дата и время старта"));
+        fields.add(dateTimeSpinner);
+
+        javax.swing.JPanel quickButtons = new javax.swing.JPanel(new java.awt.GridLayout(2, 3, 8, 8));
+        quickButtons.setBackground(Theme.PANEL);
+        quickButtons.add(createDateAdjustButton("+1 день", dateTimeSpinner, 1, 0, 0));
+        quickButtons.add(createDateAdjustButton("+1 час", dateTimeSpinner, 0, 1, 0));
+        quickButtons.add(createDateAdjustButton("+10 минут", dateTimeSpinner, 0, 0, 10));
+        quickButtons.add(createDateAdjustButton("-1 день", dateTimeSpinner, -1, 0, 0));
+        quickButtons.add(createDateAdjustButton("-1 час", dateTimeSpinner, 0, -1, 0));
+        quickButtons.add(createDateAdjustButton("-10 минут", dateTimeSpinner, 0, 0, -10));
+
+        panel.add(fields, BorderLayout.NORTH);
+        panel.add(quickButtons, BorderLayout.CENTER);
+
+        int result = JOptionPane.showConfirmDialog(this, panel, title, JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        if (result != JOptionPane.OK_OPTION) {
+            return null;
+        }
+
+        long startedAtEpochMillis = ((Date) dateTimeSpinner.getValue()).getTime();
+        String name = nameField.getText().trim().isBlank() ? "Секундомер" : nameField.getText().trim();
+        return new StopwatchDialogResult(name, startedAtEpochMillis);
+    }
+
+    private javax.swing.JButton createDateAdjustButton(String label, javax.swing.JSpinner dateTimeSpinner, int days, int hours, int minutes) {
+        javax.swing.JButton button = Theme.button(label);
+        button.addActionListener(event -> {
+            LocalDateTime dateTime = LocalDateTime.ofInstant(((Date) dateTimeSpinner.getValue()).toInstant(), ZoneId.systemDefault());
+            dateTimeSpinner.setValue(Date.from(dateTime.plusDays(days).plusHours(hours).plusMinutes(minutes).atZone(ZoneId.systemDefault()).toInstant()));
+        });
+        return button;
+    }
+
+    private long stopwatchEffectiveStartedAt(TimerEntry timer, long now) {
+        long elapsed = timer.getElapsedMillis(now);
+        return now - elapsed;
+    }
+
+    private void applyStopwatchStart(TimerEntry timer, long startedAtEpochMillis) {
+        long now = System.currentTimeMillis();
+        if (timer.isRunning()) {
+            timer.setStartedAt(startedAtEpochMillis);
+            timer.setAccumulatedMillis(0);
+        } else {
+            timer.setStartedAt(0);
+            timer.setAccumulatedMillis(Math.max(0, now - startedAtEpochMillis));
+        }
+    }
+
+    private record StopwatchDialogResult(String name, long startedAtEpochMillis) {
     }
 
     private void saveSyncSettings() {
@@ -768,6 +866,20 @@ public class WidgetFrame extends JFrame {
         copy.setContent(source.getContent());
         copy.setPinned(source.isPinned());
         copy.setArchived(source.isArchived());
+        copy.setCreatedAt(source.getCreatedAt());
+        copy.setUpdatedAt(source.getUpdatedAt());
+        return copy;
+    }
+
+    private TimerEntry copyTimer(TimerEntry source) {
+        TimerEntry copy = new TimerEntry();
+        copy.setId(source.getId());
+        copy.setName(source.getName());
+        copy.setMode(source.getMode());
+        copy.setDurationMillis(source.getDurationMillis());
+        copy.setStartedAt(source.getStartedAt());
+        copy.setAccumulatedMillis(source.getAccumulatedMillis());
+        copy.setRunning(source.isRunning());
         copy.setCreatedAt(source.getCreatedAt());
         copy.setUpdatedAt(source.getUpdatedAt());
         return copy;

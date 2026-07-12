@@ -25,6 +25,7 @@ public class TimersTabPanel extends JPanel {
     private final JList<TimerEntry> timerList = new JList<>(timerListModel);
     private final JButton addTimerButton = Theme.accentButton("Добавить таймер");
     private final JButton addStopwatchButton = Theme.button("Добавить секундомер");
+    private final JButton editStopwatchButton = Theme.button("Редактировать секундомер");
     private final JButton toggleButton = Theme.button("Старт / Пауза");
     private final JButton resetButton = Theme.button("Сбросить");
     private final JButton deleteButton = Theme.button("Удалить");
@@ -62,6 +63,7 @@ public class TimersTabPanel extends JPanel {
         actions.setBackground(Theme.PANEL);
         actions.add(addTimerButton);
         actions.add(addStopwatchButton);
+        actions.add(editStopwatchButton);
         actions.add(toggleButton);
         actions.add(resetButton);
         actions.add(deleteButton);
@@ -113,6 +115,10 @@ public class TimersTabPanel extends JPanel {
 
     public JButton getAddStopwatchButton() {
         return addStopwatchButton;
+    }
+
+    public JButton getEditStopwatchButton() {
+        return editStopwatchButton;
     }
 
     public JButton getToggleButton() {
