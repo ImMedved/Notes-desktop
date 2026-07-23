@@ -1,6 +1,7 @@
 package com.notes.client.ui;
 
 import javax.swing.BorderFactory;
+import javax.swing.AbstractButton;
 import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JEditorPane;
@@ -9,8 +10,11 @@ import javax.swing.JList;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JScrollBar;
+import javax.swing.JSpinner;
+import javax.swing.JTabbedPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
+import javax.swing.JViewport;
 import javax.swing.KeyStroke;
 import javax.swing.Timer;
 import javax.swing.ListCellRenderer;
@@ -21,6 +25,7 @@ import javax.swing.text.JTextComponent;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Component;
+import java.awt.Container;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
@@ -29,27 +34,93 @@ import java.awt.RenderingHints;
 import java.awt.event.ActionEvent;
 import java.awt.event.InputEvent;
 import java.awt.event.MouseWheelEvent;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.util.Locale;
 
 public final class Theme {
-    public static final Color BACKGROUND = new Color(12, 17, 24);
-    public static final Color PANEL = new Color(21, 28, 37);
-    public static final Color PANEL_ALT = new Color(28, 37, 49);
-    public static final Color CARD = new Color(39, 50, 66);
-    public static final Color ACCENT = new Color(91, 194, 249);
-    public static final Color ACCENT_SOFT = new Color(38, 113, 158);
-    public static final Color TEXT = new Color(239, 246, 255);
-    public static final Color MUTED = new Color(148, 163, 184);
+    public enum Mode {
+        LIGHT,
+        DARK
+    }
+
+    private static final String MUTED_LABEL = "notes.mutedLabel";
+    private static final String ACCENT_BUTTON = "notes.accentButton";
+
+    public static Color BACKGROUND;
+    public static Color PANEL;
+    public static Color PANEL_ALT;
+    public static Color CARD;
+    public static Color ACCENT;
+    public static Color ACCENT_SOFT;
+    public static Color TEXT;
+    public static Color MUTED;
+    public static Color BORDER;
+
+    private static Mode currentMode = systemMode();
+
+    static {
+        applyPalette(currentMode);
+    }
 
     private Theme() {
     }
 
     public static void install() {
+        install(currentMode);
+    }
+
+    public static void install(Mode mode) {
+        currentMode = mode;
+        applyPalette(mode);
         UIManager.put("Panel.background", BACKGROUND);
         UIManager.put("TabbedPane.selected", PANEL_ALT);
         UIManager.put("TabbedPane.contentAreaColor", PANEL);
         UIManager.put("TabbedPane.foreground", TEXT);
         UIManager.put("TabbedPane.background", PANEL);
         UIManager.put("TabbedPane.focus", ACCENT);
+        UIManager.put("OptionPane.background", PANEL);
+        UIManager.put("OptionPane.messageForeground", TEXT);
+        UIManager.put("Button.foreground", TEXT);
+        UIManager.put("TextField.background", PANEL_ALT);
+        UIManager.put("TextField.foreground", TEXT);
+        UIManager.put("TextArea.background", PANEL_ALT);
+        UIManager.put("TextArea.foreground", TEXT);
+    }
+
+    public static Mode currentMode() {
+        return currentMode;
+    }
+
+    public static Mode toggledMode() {
+        return currentMode == Mode.DARK ? Mode.LIGHT : Mode.DARK;
+    }
+
+    public static Mode systemMode() {
+        if (!System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win")) {
+            return Mode.LIGHT;
+        }
+        try {
+            Process process = new ProcessBuilder(
+                    "reg",
+                    "query",
+                    "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+                    "/v",
+                    "AppsUseLightTheme"
+            ).redirectErrorStream(true).start();
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    if (line.contains("AppsUseLightTheme") && line.toLowerCase(Locale.ROOT).contains("0x0")) {
+                        return Mode.DARK;
+                    }
+                }
+            }
+            process.waitFor();
+        } catch (Exception ignored) {
+            return Mode.LIGHT;
+        }
+        return Mode.LIGHT;
     }
 
     public static Font titleFont() {
@@ -79,6 +150,7 @@ public final class Theme {
 
     public static JLabel mutedLabel(String text) {
         JLabel label = label(text);
+        label.putClientProperty(MUTED_LABEL, Boolean.TRUE);
         label.setForeground(MUTED);
         return label;
     }
@@ -151,6 +223,7 @@ public final class Theme {
     public static JButton button(String text) {
         JButton button = new JButton(text);
         button.setFocusPainted(false);
+        button.setCursor(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR));
         button.setForeground(TEXT);
         button.setBackground(CARD);
         button.setOpaque(false);
@@ -162,8 +235,30 @@ public final class Theme {
 
     public static JButton accentButton(String text) {
         JButton button = button(text);
+        button.putClientProperty(ACCENT_BUTTON, Boolean.TRUE);
         button.setBorder(new RoundedBorder(ACCENT_SOFT));
         return button;
+    }
+
+    public static void applyToTree(Component component) {
+        applyToComponent(component);
+        if (component instanceof Container container) {
+            for (Component child : container.getComponents()) {
+                applyToTree(child);
+            }
+        }
+    }
+
+    public static void styleButton(AbstractButton button) {
+        boolean accent = Boolean.TRUE.equals(button.getClientProperty(ACCENT_BUTTON));
+        button.setForeground(TEXT);
+        button.setBackground(accent ? ACCENT_SOFT : CARD);
+        button.setBorder(new RoundedBorder(accent ? ACCENT_SOFT : CARD));
+        button.setFont(bodyFont());
+    }
+
+    public static String colorHex(Color color) {
+        return "%02x%02x%02x".formatted(color.getRed(), color.getGreen(), color.getBlue());
     }
 
     public static <T> void styleList(JList<T> list) {
@@ -189,9 +284,86 @@ public final class Theme {
 
     private static Border compoundBorder() {
         return BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(56, 67, 79), 1, true),
+                BorderFactory.createLineBorder(BORDER, 1, true),
                 BorderFactory.createEmptyBorder(8, 10, 8, 10)
         );
+    }
+
+    private static void applyPalette(Mode mode) {
+        if (mode == Mode.DARK) {
+            BACKGROUND = new Color(12, 17, 24);
+            PANEL = new Color(21, 28, 37);
+            PANEL_ALT = new Color(28, 37, 49);
+            CARD = new Color(39, 50, 66);
+            ACCENT = new Color(91, 194, 249);
+            ACCENT_SOFT = new Color(38, 113, 158);
+            TEXT = new Color(239, 246, 255);
+            MUTED = new Color(148, 163, 184);
+            BORDER = new Color(56, 67, 79);
+            return;
+        }
+
+        BACKGROUND = new Color(248, 242, 232);
+        PANEL = new Color(255, 250, 242);
+        PANEL_ALT = new Color(252, 246, 236);
+        CARD = new Color(230, 218, 238);
+        ACCENT = new Color(126, 77, 184);
+        ACCENT_SOFT = new Color(183, 148, 218);
+        TEXT = new Color(42, 35, 49);
+        MUTED = new Color(116, 102, 126);
+        BORDER = new Color(220, 207, 226);
+    }
+
+    private static void applyToComponent(Component component) {
+        if (component instanceof JPanel panel) {
+            panel.setBackground(PANEL);
+        }
+        if (component instanceof JLabel label) {
+            label.setForeground(Boolean.TRUE.equals(label.getClientProperty(MUTED_LABEL)) ? MUTED : TEXT);
+        }
+        if (component instanceof AbstractButton button) {
+            styleButton(button);
+        }
+        if (component instanceof JTextField field) {
+            field.setBackground(PANEL_ALT);
+            field.setForeground(TEXT);
+            field.setCaretColor(TEXT);
+            field.setBorder(compoundBorder());
+            field.setFont(bodyFont());
+        }
+        if (component instanceof JTextArea area) {
+            area.setBackground(PANEL_ALT);
+            area.setForeground(TEXT);
+            area.setCaretColor(TEXT);
+            area.setSelectionColor(ACCENT_SOFT);
+            area.setSelectedTextColor(TEXT);
+            area.setBorder(compoundBorder());
+            area.setFont(monoFont());
+        }
+        if (component instanceof JEditorPane pane) {
+            pane.setBackground(PANEL_ALT);
+            pane.setForeground(TEXT);
+            pane.setBorder(compoundBorder());
+            pane.setFont(bodyFont());
+        }
+        if (component instanceof JList<?> list) {
+            styleList(list);
+        }
+        if (component instanceof JScrollPane scrollPane) {
+            scrollPane.setBorder(BorderFactory.createEmptyBorder());
+            scrollPane.getViewport().setBackground(PANEL_ALT);
+        }
+        if (component instanceof JViewport viewport) {
+            viewport.setBackground(PANEL_ALT);
+        }
+        if (component instanceof JTabbedPane tabs) {
+            tabs.setBackground(PANEL);
+            tabs.setForeground(TEXT);
+            tabs.setFont(bodyFont());
+        }
+        if (component instanceof JSpinner spinner) {
+            spinner.setFont(bodyFont());
+        }
     }
 
     private static void installSmoothWheelScroll(JScrollPane scrollPane) {

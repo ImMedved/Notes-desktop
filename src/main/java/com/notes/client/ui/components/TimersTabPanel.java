@@ -23,14 +23,14 @@ import java.awt.GridLayout;
 public class TimersTabPanel extends JPanel {
     private final DefaultListModel<TimerEntry> timerListModel = new DefaultListModel<>();
     private final JList<TimerEntry> timerList = new JList<>(timerListModel);
-    private final JButton addTimerButton = Theme.accentButton("Добавить таймер");
-    private final JButton addStopwatchButton = Theme.button("Добавить секундомер");
-    private final JButton editStopwatchButton = Theme.button("Редактировать секундомер");
-    private final JButton toggleButton = Theme.button("Старт / Пауза");
-    private final JButton resetButton = Theme.button("Сбросить");
-    private final JButton deleteButton = Theme.button("Удалить");
+    private final JButton addTimerButton = Theme.accentButton("Add timer");
+    private final JButton addStopwatchButton = Theme.button("Add stopwatch");
+    private final JButton editStopwatchButton = Theme.button("Edit stopwatch");
+    private final JButton toggleButton = Theme.button("Start / Pause");
+    private final JButton resetButton = Theme.button("Reset");
+    private final JButton deleteButton = Theme.button("Delete");
     private final javax.swing.JLabel timerDetailLabel = Theme.label("00:00:00");
-    private final javax.swing.JLabel timerMetaLabel = Theme.mutedLabel("Нет выбранного таймера");
+    private final javax.swing.JLabel timerMetaLabel = Theme.mutedLabel("No timer selected");
 
     public TimersTabPanel() {
         super(new BorderLayout(16, 16));
@@ -46,8 +46,8 @@ public class TimersTabPanel extends JPanel {
             @Override
             public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
                 TimerEntry timer = (TimerEntry) value;
-                String status = timer.getMode() == TimerMode.STOPWATCH ? "секундомер" : "таймер";
-                String text = "<html><b>" + escape(timer.getName()) + "</b><br/><span style='color:#9AA6B2;'>"
+                String status = timer.getMode() == TimerMode.STOPWATCH ? "stopwatch" : "timer";
+                String text = "<html><b>" + escape(timer.getName()) + "</b><br/><span style='color:#" + Theme.colorHex(Theme.MUTED) + ";'>"
                         + status + "</span></html>";
                 return super.getListCellRendererComponent(list, text, index, isSelected, cellHasFocus);
             }
@@ -56,7 +56,7 @@ public class TimersTabPanel extends JPanel {
         JPanel left = Theme.panel();
         left.setLayout(new BorderLayout(12, 12));
         left.setBorder(BorderFactory.createEmptyBorder(14, 14, 14, 14));
-        left.add(Theme.label("Таймеры"), BorderLayout.NORTH);
+        left.add(Theme.label("Timers"), BorderLayout.NORTH);
         left.add(Theme.scrollPane(timerList), BorderLayout.CENTER);
 
         JPanel actions = new JPanel(new GridLayout(0, 1, 8, 8));
@@ -74,7 +74,7 @@ public class TimersTabPanel extends JPanel {
         detail.setLayout(new BorderLayout(14, 14));
         detail.setBorder(BorderFactory.createEmptyBorder(18, 18, 18, 18));
 
-        javax.swing.JLabel title = Theme.label("Активный таймер");
+        javax.swing.JLabel title = Theme.label("Active timer");
         title.setFont(new Font("Bahnschrift", Font.BOLD, 22));
         timerDetailLabel.setHorizontalAlignment(SwingConstants.CENTER);
         timerDetailLabel.setFont(new Font("Bahnschrift", Font.BOLD, 56));
@@ -139,6 +139,13 @@ public class TimersTabPanel extends JPanel {
 
     public javax.swing.JLabel getTimerMetaLabel() {
         return timerMetaLabel;
+    }
+
+    public void applyTheme() {
+        Theme.applyToTree(this);
+        setBackground(Theme.BACKGROUND);
+        timerDetailLabel.setForeground(Theme.ACCENT);
+        timerList.repaint();
     }
 
     private static String escape(String value) {

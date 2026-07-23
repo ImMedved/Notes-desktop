@@ -1,4 +1,6 @@
 target/
 dist/
 .idea/
+.agents/
 *.iml
+STYLE.md

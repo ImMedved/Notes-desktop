@@ -43,8 +43,6 @@ public class ClientCacheStore {
                 encoder.writeObject(snapshot);
                 encoder.flush();
             }
-        } catch (Exception ignored) {
-            // Snapshot cache is best-effort.
-        }
+        } catch (Exception ignored) {}
     }
 }

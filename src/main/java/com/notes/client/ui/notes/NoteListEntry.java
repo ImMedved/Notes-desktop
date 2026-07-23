@@ -8,11 +8,11 @@ public record NoteListEntry(Note note, String title, String subtitle, NoteListAc
     }
 
     public static NoteListEntry archiveEntry() {
-        return new NoteListEntry(null, "Архив", "Открыть архив заметок", NoteListAction.OPEN_ARCHIVE);
+        return new NoteListEntry(null, "Archive", "Open archived notes", NoteListAction.OPEN_ARCHIVE);
     }
 
     public static NoteListEntry backEntry() {
-        return new NoteListEntry(null, "Назад к заметкам", "Вернуться к активным заметкам", NoteListAction.BACK_TO_NOTES);
+        return new NoteListEntry(null, "Back to notes", "Return to active notes", NoteListAction.BACK_TO_NOTES);
     }
 
     public boolean navigation() {

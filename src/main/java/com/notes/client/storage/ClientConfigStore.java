@@ -43,8 +43,6 @@ public class ClientConfigStore {
                 encoder.writeObject(config);
                 encoder.flush();
             }
-        } catch (Exception ignored) {
-            // Local config errors should not crash the widget.
-        }
+        } catch (Exception ignored) {}
     }
 }

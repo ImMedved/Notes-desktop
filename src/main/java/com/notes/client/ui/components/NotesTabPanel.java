@@ -1,6 +1,7 @@
 package com.notes.client.ui.components;
 
 import com.notes.client.ui.Theme;
+import com.notes.client.ui.notes.MarkdownPreviewRenderer;
 import com.notes.client.ui.notes.NoteListEntry;
 
 import javax.swing.BorderFactory;
@@ -33,11 +34,11 @@ public class NotesTabPanel extends JPanel {
 
     private final DefaultListModel<NoteListEntry> noteListModel = new DefaultListModel<>();
     private final JList<NoteListEntry> noteList = new JList<>(noteListModel);
-    private final JButton addButton = Theme.accentButton("Новая");
-    private final JButton deleteButton = Theme.button("Удалить");
-    private final JButton editSaveButton = Theme.button("Редактировать");
-    private final JButton pinButton = Theme.button("Закрепить");
-    private final JButton archiveButton = Theme.button("Архивировать");
+    private final JButton addButton = Theme.accentButton("New");
+    private final JButton deleteButton = Theme.button("Delete");
+    private final JButton editSaveButton = Theme.button("Edit");
+    private final JButton pinButton = Theme.button("Pin");
+    private final JButton archiveButton = Theme.button("Archive");
     private final JTextField noteTitleField = Theme.textField();
     private final JTextArea noteContentArea = Theme.textArea();
     private final JEditorPane previewPane = Theme.htmlPane();
@@ -49,7 +50,7 @@ public class NotesTabPanel extends JPanel {
     private final JButton boldButton = Theme.button("Bold");
     private final JButton codeButton = Theme.button("Code");
     private final JButton linkButton = Theme.button("Link");
-    private final javax.swing.JLabel noteMetaLabel = Theme.mutedLabel("Локальный кеш");
+    private final javax.swing.JLabel noteMetaLabel = Theme.mutedLabel("Local cache");
     private final JPanel markdownToolbar = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
     private final JPanel contentCardPanel = new JPanel(new CardLayout());
     private final JScrollPane previewScrollPane = Theme.smoothScrollPane(previewPane);
@@ -71,12 +72,13 @@ public class NotesTabPanel extends JPanel {
             public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
                 NoteListEntry entry = (NoteListEntry) value;
                 String text;
+                String mutedColor = Theme.colorHex(Theme.MUTED);
                 if (entry.navigation()) {
-                    text = "<html><b>" + escape(entry.title()) + "</b><br/><span style='color:#9AA6B2;'>"
+                    text = "<html><b>" + escape(entry.title()) + "</b><br/><span style='color:#" + mutedColor + ";'>"
                             + escape(entry.subtitle()) + "</span></html>";
                 } else {
                     String prefix = entry.note().isPinned() ? "\u2022 " : "";
-                    text = "<html><b>" + escape(prefix + entry.note().getTitle()) + "</b><br/><span style='color:#9AA6B2;'>"
+                    text = "<html><b>" + escape(prefix + entry.note().getTitle()) + "</b><br/><span style='color:#" + mutedColor + ";'>"
                             + DATE_TIME_FORMATTER.format(Instant.ofEpochMilli(entry.note().getUpdatedAt())) + "</span></html>";
                 }
                 return super.getListCellRendererComponent(list, text, index, isSelected, cellHasFocus);
@@ -86,7 +88,7 @@ public class NotesTabPanel extends JPanel {
         JPanel listPanel = Theme.panel();
         listPanel.setLayout(new BorderLayout(12, 12));
         listPanel.setBorder(BorderFactory.createEmptyBorder(14, 14, 14, 14));
-        listPanel.add(Theme.label("Заметки"), BorderLayout.NORTH);
+        listPanel.add(Theme.label("Notes"), BorderLayout.NORTH);
         listPanel.add(Theme.scrollPane(noteList), BorderLayout.CENTER);
 
         JPanel listActions = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
@@ -236,12 +238,12 @@ public class NotesTabPanel extends JPanel {
         CardLayout layout = (CardLayout) contentCardPanel.getLayout();
         layout.show(contentCardPanel, editMode ? EDIT_CARD : PREVIEW_CARD);
         markdownToolbar.setVisible(editMode);
-        editSaveButton.setText(editMode ? "Сохранить" : "Редактировать");
+        editSaveButton.setText(editMode ? "Save" : "Edit");
     }
 
     public void setPinArchivedState(boolean pinned, boolean archived) {
-        pinButton.setText(pinned ? "Открепить" : "Закрепить");
-        archiveButton.setText(archived ? "Разархивировать" : "Архивировать");
+        pinButton.setText(pinned ? "Unpin" : "Pin");
+        archiveButton.setText(archived ? "Unarchive" : "Archive");
     }
 
     public void setEditorEnabled(boolean enabled) {
@@ -258,6 +260,13 @@ public class NotesTabPanel extends JPanel {
         boldButton.setEnabled(enabled);
         codeButton.setEnabled(enabled);
         linkButton.setEnabled(enabled);
+    }
+
+    public void applyTheme() {
+        Theme.applyToTree(this);
+        setBackground(Theme.BACKGROUND);
+        noteList.repaint();
+        setPreviewHtml(MarkdownPreviewRenderer.render(noteContentArea.getText()));
     }
 
     private static String escape(String value) {

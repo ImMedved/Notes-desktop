@@ -71,6 +71,7 @@ public class WidgetFrame extends JFrame {
     private boolean archiveView;
     private String activeNoteSelectionId;
     private String archivedNoteSelectionId;
+    private JTabbedPane tabs;
     private Point dragStart;
 
     public WidgetFrame(ClientAppService appService) {
@@ -124,7 +125,7 @@ public class WidgetFrame extends JFrame {
     }
 
     private JTabbedPane buildContent() {
-        JTabbedPane tabs = new JTabbedPane();
+        tabs = new JTabbedPane();
         tabs.setFont(Theme.bodyFont());
         tabs.setBackground(Theme.PANEL);
         tabs.setForeground(Theme.TEXT);
@@ -137,6 +138,7 @@ public class WidgetFrame extends JFrame {
 
     private void bindHeader() {
         headerPanel.getSyncButton().addActionListener(event -> syncNowAsync());
+        headerPanel.getThemeButton().addActionListener(event -> toggleTheme());
         headerPanel.getMinimizeButton().addActionListener(event -> hideToTray());
         headerPanel.getPinButton().addActionListener(event -> {
             boolean next = !isAlwaysOnTop();
@@ -157,6 +159,30 @@ public class WidgetFrame extends JFrame {
                 hideToTray();
             }
         });
+    }
+
+    private void toggleTheme() {
+        Theme.install(Theme.toggledMode());
+        applyTheme();
+    }
+
+    private void applyTheme() {
+        SwingUtilities.updateComponentTreeUI(this);
+        getContentPane().setBackground(Theme.BACKGROUND);
+        if (tabs != null) {
+            tabs.setBackground(Theme.PANEL);
+            tabs.setForeground(Theme.TEXT);
+        }
+        headerPanel.applyTheme();
+        notesTabPanel.applyTheme();
+        timersTabPanel.applyTheme();
+        syncTabPanel.applyTheme();
+        if (shellIntegration != null) {
+            shellIntegration.refreshTrayImage();
+        }
+        refreshLiveTimerState();
+        refreshSyncPanel(appService.snapshotView());
+        repaint();
     }
 
     private void bindNotes() {
@@ -256,7 +282,7 @@ public class WidgetFrame extends JFrame {
     private void installShellIntegration() {
         shellIntegration = new DesktopShellIntegration(this::isVisible, this::showFromTray, this::hideToTray, this::exitApplication);
         shellIntegration.install();
-        shellIntegration.showTrayMessage("Notes Widget Client", "Свернуть/развернуть: Ctrl+Alt+Space");
+        shellIntegration.showTrayMessage("Notes Widget Client", "Hide/show: Ctrl+Alt+Space");
     }
 
     private void showFromTray() {
@@ -369,19 +395,19 @@ public class WidgetFrame extends JFrame {
         autoSyncTimer.setInitialDelay(state.getConfig().getSyncIntervalSeconds() * 1000);
 
         if (state.isServerReachable()) {
-            syncTabPanel.getConnectionStatusLabel().setText("Сервер доступен");
+            syncTabPanel.getConnectionStatusLabel().setText("Server is available");
             syncTabPanel.getConnectionStatusLabel().setForeground(new Color(115, 223, 160));
         } else if (state.getLastError() != null && !state.getLastError().isBlank()) {
             syncTabPanel.getConnectionStatusLabel().setText(state.getLastError());
             syncTabPanel.getConnectionStatusLabel().setForeground(new Color(255, 190, 92));
         } else {
-            syncTabPanel.getConnectionStatusLabel().setText("Сервер: неизвестно");
+            syncTabPanel.getConnectionStatusLabel().setText("Server: unknown");
             syncTabPanel.getConnectionStatusLabel().setForeground(Theme.MUTED);
         }
 
         syncTabPanel.getLastSyncLabel().setText(state.getLastSuccessfulSyncEpochMillis() == 0
-                ? "Последняя синхронизация: еще не было"
-                : "Последняя синхронизация: " + DATE_TIME_FORMATTER.format(Instant.ofEpochMilli(state.getLastSuccessfulSyncEpochMillis())));
+                ? "Last sync: never"
+                : "Last sync: " + DATE_TIME_FORMATTER.format(Instant.ofEpochMilli(state.getLastSuccessfulSyncEpochMillis())));
         syncTabPanel.getRevisionLabel().setText("Revision: " + state.getSnapshot().getRevision());
     }
 
@@ -395,13 +421,13 @@ public class WidgetFrame extends JFrame {
             notesTabPanel.getNoteContentArea().setText("");
             notesTabPanel.setPreviewHtml(MarkdownPreviewRenderer.render(""));
             notesTabPanel.setPinArchivedState(false, false);
-            notesTabPanel.getNoteMetaLabel().setText(archiveView ? "Выберите заметку из архива" : "Выберите заметку");
+            notesTabPanel.getNoteMetaLabel().setText(archiveView ? "Select a note from the archive" : "Select a note");
         } else {
             notesTabPanel.getNoteTitleField().setText(note.getTitle());
             notesTabPanel.getNoteContentArea().setText(note.getContent());
             notesTabPanel.setPreviewHtml(MarkdownPreviewRenderer.render(note.getContent()));
             notesTabPanel.setPinArchivedState(note.isPinned(), note.isArchived());
-            notesTabPanel.getNoteMetaLabel().setText("Изменена: " + DATE_TIME_FORMATTER.format(Instant.ofEpochMilli(note.getUpdatedAt())));
+            notesTabPanel.getNoteMetaLabel().setText("Modified: " + DATE_TIME_FORMATTER.format(Instant.ofEpochMilli(note.getUpdatedAt())));
         }
         notesTabPanel.setEditorEnabled(note != null);
         suppressNoteEvents = false;
@@ -418,7 +444,7 @@ public class WidgetFrame extends JFrame {
 
         Note updated = copyOf(selected);
         updated.setTitle(notesTabPanel.getNoteTitleField().getText().trim().isBlank()
-                ? "Без названия"
+                ? "Untitled"
                 : notesTabPanel.getNoteTitleField().getText().trim());
         updated.setContent(notesTabPanel.getNoteContentArea().getText());
         updated.setUpdatedAt(System.currentTimeMillis());
@@ -467,7 +493,7 @@ public class WidgetFrame extends JFrame {
         TimerEntry timer = timersTabPanel.getTimerList().getSelectedValue();
         if (timer == null) {
             timersTabPanel.getTimerDetailLabel().setText("00:00:00");
-            timersTabPanel.getTimerMetaLabel().setText("Нет выбранного таймера");
+            timersTabPanel.getTimerMetaLabel().setText("No timer selected");
             timersTabPanel.getEditStopwatchButton().setEnabled(false);
             return;
         }
@@ -479,8 +505,8 @@ public class WidgetFrame extends JFrame {
                 : formatDuration(timer.getRemainingMillis(now));
         timersTabPanel.getTimerDetailLabel().setText(value);
 
-        String label = timer.getMode() == TimerMode.STOPWATCH ? "Секундомер" : "Таймер";
-        String state = timer.isRunning() ? "работает" : "на паузе";
+        String label = timer.getMode() == TimerMode.STOPWATCH ? "Stopwatch" : "Timer";
+        String state = timer.isRunning() ? "running" : "paused";
         timersTabPanel.getTimerMetaLabel().setText(label + " \"" + timer.getName() + "\" " + state);
     }
 
@@ -514,18 +540,18 @@ public class WidgetFrame extends JFrame {
 
         javax.swing.JPanel panel = new javax.swing.JPanel(new java.awt.GridLayout(0, 2, 8, 8));
         panel.setBackground(Theme.PANEL);
-        panel.add(Theme.label("Название"));
+        panel.add(Theme.label("Name"));
         panel.add(nameField);
-        panel.add(Theme.label("Дни"));
+        panel.add(Theme.label("Days"));
         panel.add(days);
-        panel.add(Theme.label("Часы"));
+        panel.add(Theme.label("Hours"));
         panel.add(hours);
-        panel.add(Theme.label("Минуты"));
+        panel.add(Theme.label("Minutes"));
         panel.add(minutes);
-        panel.add(Theme.label("Секунды"));
+        panel.add(Theme.label("Seconds"));
         panel.add(seconds);
 
-        int result = JOptionPane.showConfirmDialog(this, panel, "Новый таймер", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        int result = JOptionPane.showConfirmDialog(this, panel, "New timer", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
         if (result == JOptionPane.OK_OPTION) {
             long totalMillis = ((((long) (int) days.getValue() * 24
                     + (int) hours.getValue()) * 60
@@ -543,7 +569,7 @@ public class WidgetFrame extends JFrame {
     }
 
     private void openStopwatchDialog() {
-        StopwatchDialogResult result = showStopwatchDialog("Новый секундомер", null);
+        StopwatchDialogResult result = showStopwatchDialog("New stopwatch", null);
         if (result == null) {
             return;
         }
@@ -556,11 +582,11 @@ public class WidgetFrame extends JFrame {
     private void openEditStopwatchDialog() {
         TimerEntry selected = timersTabPanel.getTimerList().getSelectedValue();
         if (selected == null || selected.getMode() != TimerMode.STOPWATCH) {
-            JOptionPane.showMessageDialog(this, "Выберите секундомер для редактирования.", "Редактирование секундомера", JOptionPane.INFORMATION_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Select a stopwatch to edit.", "Edit stopwatch", JOptionPane.INFORMATION_MESSAGE);
             return;
         }
 
-        StopwatchDialogResult result = showStopwatchDialog("Редактировать секундомер", selected);
+        StopwatchDialogResult result = showStopwatchDialog("Edit stopwatch", selected);
         if (result == null) {
             return;
         }
@@ -589,19 +615,19 @@ public class WidgetFrame extends JFrame {
 
         javax.swing.JPanel fields = new javax.swing.JPanel(new java.awt.GridLayout(0, 2, 8, 8));
         fields.setBackground(Theme.PANEL);
-        fields.add(Theme.label("Название"));
+        fields.add(Theme.label("Name"));
         fields.add(nameField);
-        fields.add(Theme.label("Дата и время старта"));
+        fields.add(Theme.label("Start date and time"));
         fields.add(dateTimeSpinner);
 
         javax.swing.JPanel quickButtons = new javax.swing.JPanel(new java.awt.GridLayout(2, 3, 8, 8));
         quickButtons.setBackground(Theme.PANEL);
-        quickButtons.add(createDateAdjustButton("+1 день", dateTimeSpinner, 1, 0, 0));
-        quickButtons.add(createDateAdjustButton("+1 час", dateTimeSpinner, 0, 1, 0));
-        quickButtons.add(createDateAdjustButton("+10 минут", dateTimeSpinner, 0, 0, 10));
-        quickButtons.add(createDateAdjustButton("-1 день", dateTimeSpinner, -1, 0, 0));
-        quickButtons.add(createDateAdjustButton("-1 час", dateTimeSpinner, 0, -1, 0));
-        quickButtons.add(createDateAdjustButton("-10 минут", dateTimeSpinner, 0, 0, -10));
+        quickButtons.add(createDateAdjustButton("+1 day", dateTimeSpinner, 1, 0, 0));
+        quickButtons.add(createDateAdjustButton("+1 hour", dateTimeSpinner, 0, 1, 0));
+        quickButtons.add(createDateAdjustButton("+10 min", dateTimeSpinner, 0, 0, 10));
+        quickButtons.add(createDateAdjustButton("-1 day", dateTimeSpinner, -1, 0, 0));
+        quickButtons.add(createDateAdjustButton("-1 hour", dateTimeSpinner, 0, -1, 0));
+        quickButtons.add(createDateAdjustButton("-10 min", dateTimeSpinner, 0, 0, -10));
 
         panel.add(fields, BorderLayout.NORTH);
         panel.add(quickButtons, BorderLayout.CENTER);
@@ -612,7 +638,7 @@ public class WidgetFrame extends JFrame {
         }
 
         long startedAtEpochMillis = ((Date) dateTimeSpinner.getValue()).getTime();
-        String name = nameField.getText().trim().isBlank() ? "Секундомер" : nameField.getText().trim();
+        String name = nameField.getText().trim().isBlank() ? "Stopwatch" : nameField.getText().trim();
         return new StopwatchDialogResult(name, startedAtEpochMillis);
     }
 
@@ -693,7 +719,7 @@ public class WidgetFrame extends JFrame {
 
         Note updated = copyOf(selected);
         updated.setTitle(notesTabPanel.getNoteTitleField().getText().trim().isBlank()
-                ? "Без названия"
+                ? "Untitled"
                 : notesTabPanel.getNoteTitleField().getText().trim());
         updated.setContent(toggledMarkdown);
         updated.setUpdatedAt(System.currentTimeMillis());
@@ -895,7 +921,7 @@ public class WidgetFrame extends JFrame {
                 task.run();
             } catch (Exception exception) {
                 if (!silentOnError) {
-                    SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(this, exception.getMessage(), "Ошибка", JOptionPane.ERROR_MESSAGE));
+                    SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(this, exception.getMessage(), "Error", JOptionPane.ERROR_MESSAGE));
                 }
             }
         });

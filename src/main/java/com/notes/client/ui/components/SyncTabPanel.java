@@ -21,11 +21,11 @@ public class SyncTabPanel extends JPanel {
     private final JTextField apiKeyField = Theme.textField();
     private final JTextField clientIdField = Theme.textField();
     private final JSpinner intervalSpinner = new JSpinner(new SpinnerNumberModel(60, 15, 600, 15));
-    private final javax.swing.JLabel connectionStatusLabel = Theme.label("Сервер: неизвестно");
-    private final javax.swing.JLabel lastSyncLabel = Theme.mutedLabel("Последняя синхронизация: еще не было");
+    private final javax.swing.JLabel connectionStatusLabel = Theme.label("Server: unknown");
+    private final javax.swing.JLabel lastSyncLabel = Theme.mutedLabel("Last sync: never");
     private final javax.swing.JLabel revisionLabel = Theme.mutedLabel("Revision: 0");
-    private final JButton saveButton = Theme.accentButton("Сохранить");
-    private final JButton testButton = Theme.button("Проверить");
+    private final JButton saveButton = Theme.accentButton("Save");
+    private final JButton testButton = Theme.button("Test");
     private final JButton syncButton = Theme.button("Sync now");
 
     public SyncTabPanel() {
@@ -70,7 +70,7 @@ public class SyncTabPanel extends JPanel {
 
         gc.gridx = 0;
         gc.gridy++;
-        form.add(Theme.label("Интервал, сек"), gc);
+        form.add(Theme.label("Interval, sec"), gc);
 
         gc.gridx = 1;
         intervalSpinner.setFont(Theme.bodyFont());
@@ -78,21 +78,21 @@ public class SyncTabPanel extends JPanel {
 
         gc.gridx = 0;
         gc.gridy++;
-        form.add(Theme.label("Статус"), gc);
+        form.add(Theme.label("Status"), gc);
 
         gc.gridx = 1;
         form.add(connectionStatusLabel, gc);
 
         gc.gridx = 0;
         gc.gridy++;
-        form.add(Theme.label("Синхронизация"), gc);
+        form.add(Theme.label("Sync"), gc);
 
         gc.gridx = 1;
         form.add(lastSyncLabel, gc);
 
         gc.gridx = 0;
         gc.gridy++;
-        form.add(Theme.label("Ревизия"), gc);
+        form.add(Theme.label("Revision"), gc);
 
         gc.gridx = 1;
         form.add(revisionLabel, gc);
@@ -160,5 +160,10 @@ public class SyncTabPanel extends JPanel {
 
     public JButton getSyncButton() {
         return syncButton;
+    }
+
+    public void applyTheme() {
+        Theme.applyToTree(this);
+        setBackground(Theme.BACKGROUND);
     }
 }

@@ -70,7 +70,7 @@ public class ClientAppService {
         if (serverReachable) {
             this.lastError = "";
         } else {
-            this.lastError = "Сервер недоступен по текущему URL.";
+            this.lastError = "The server is unavailable at the current URL.";
         }
         notifyListeners();
     }
@@ -78,8 +78,8 @@ public class ClientAppService {
     public synchronized Note createNote() throws Exception {
         Note note = new Note();
         note.setId(UUID.randomUUID().toString());
-        note.setTitle("Новая заметка");
-        note.setContent("# Новая заметка\n\n- первая мысль");
+        note.setTitle("New note");
+        note.setContent("# New note\n\n- first thought");
         note.setPinned(false);
         note.setArchived(false);
         note.setCreatedAt(System.currentTimeMillis());
@@ -107,7 +107,7 @@ public class ClientAppService {
         TimerEntry timer = new TimerEntry();
         timer.setId(UUID.randomUUID().toString());
         timer.setMode(TimerMode.COUNTDOWN);
-        timer.setName(name == null || name.isBlank() ? "Таймер" : name.trim());
+        timer.setName(name == null || name.isBlank() ? "Timer" : name.trim());
         timer.setDurationMillis(durationMillis);
         timer.setCreatedAt(System.currentTimeMillis());
         timer.setUpdatedAt(System.currentTimeMillis());
@@ -124,7 +124,7 @@ public class ClientAppService {
         TimerEntry timer = new TimerEntry();
         timer.setId(UUID.randomUUID().toString());
         timer.setMode(TimerMode.STOPWATCH);
-        timer.setName(name == null || name.isBlank() ? "Секундомер" : name.trim());
+        timer.setName(name == null || name.isBlank() ? "Stopwatch" : name.trim());
         timer.setDurationMillis(365L * 24 * 60 * 60 * 1000);
         timer.setStartedAt(startedAt);
         timer.setAccumulatedMillis(0);
@@ -201,12 +201,12 @@ public class ClientAppService {
     private void ensureDefaults() {
         if (snapshot.getNotes().isEmpty()) {
             Note note = new Note();
-            note.setTitle("Клиент готов");
+            note.setTitle("Client ready");
             note.setContent("""
                     # Notes Client
 
-                    Настройте URL сервера Tailscale и API key на вкладке Sync.
-                    После первой синхронизации локальный кеш будет заменен снимком сервера.
+                    Configure the Tailscale server URL and API key on the Sync tab.
+                    After the first sync, the local cache will be replaced with the server snapshot.
                     """);
             snapshot.getNotes().add(note);
         }

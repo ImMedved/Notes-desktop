@@ -35,7 +35,7 @@ public final class MarkdownPreviewRenderer {
     }
 
     public static String render(String markdown) {
-        String safeMarkdown = markdown == null || markdown.isBlank() ? "_Пустая заметка_" : markdown;
+        String safeMarkdown = markdown == null || markdown.isBlank() ? "_Empty note_" : markdown;
         String displayMarkdown = MarkdownPreviewLayoutBuilder.build(safeMarkdown);
         String htmlBody = RENDERER.render(PARSER.parse(transformTaskLists(displayMarkdown)));
         return """
