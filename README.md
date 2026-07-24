@@ -2,6 +2,52 @@
 
 Standalone Windows desktop client project for notes and timers. Works with [server](https://github.com/ImMedved/Notes-server). App has [Android version](https://github.com/ImMedved/Notes-android), that can be synced with desktop via server.
 
+## Table of contents
+* [1. Screenshots](#Screenshots)
+* [2. Contents](#Contents)
+* [3. Build/Run](#Build)
+* [4. TODO](#TODO)
+
+## Screenshots
+
+### View all notes
+
+<img src="Screens/mainScreen.png" width="50%">
+
+### View all timers and stopwatches
+
+<img src="Screens/timerScreen.png" width="50%">
+
+### Markdown editor
+
+<img src="Screens/editorScreen.png" width="50%">
+
+### Light theme
+
+<img src="Screens/lightScreen.png" width="50%">
+
+## Android Screenshots
+
+### View all notes
+
+<img src="Screens/mainScreenAndroid.jpeg" width="30%">
+
+### Note preview
+
+<img src="Screens/noteViewAndroid.jpeg" width="30%">
+
+### View all timers and stopwatches
+
+<img src="Screens/timersAndroid.jpeg" width="30%">
+
+### Markdown editor
+
+<img src="Screens/editorAndroid.jpeg" width="30%">
+
+### Light theme
+
+<img src="Screens/lightScreenAndroid.jpeg" width="30%">
+
 ## Contents
 
 - Java 17 desktop widget
@@ -15,7 +61,7 @@ Standalone Windows desktop client project for notes and timers. Works with [serv
 mvn -q -DskipTests package
 ```
 
-## Build EXE
+### Build EXE
 
 Windows only:
 
@@ -27,7 +73,7 @@ Output:
 
 - `dist\NotesWidgetClient\NotesWidgetClient.exe`
 
-## First local run
+### First local run
 
 By default the client points to:
 
